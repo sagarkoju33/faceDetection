@@ -1,103 +1,175 @@
 import 'dart:io';
+import 'package:camera/camera.dart';
+import 'package:facedetection/front_camera.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
+import 'package:path/path.dart' as path;
 
 class FaceValidationScreen extends StatefulWidget {
   const FaceValidationScreen({super.key});
 
   @override
-  _FaceValidationScreenState createState() => _FaceValidationScreenState();
+  State<FaceValidationScreen> createState() => _FaceValidationScreenState();
 }
 
 class _FaceValidationScreenState extends State<FaceValidationScreen> {
   File? _imageFile;
-  String _resultText = '';
+  String _resultText = 'No image yet.';
 
-  Future<void> captureCropAndDetectFace() async {
-    final ImagePicker picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.camera);
+  @override
+  void initState() {
+    super.initState();
+    _startCameraFlow();
+  }
 
-    if (image == null) {
-      setState(() => _resultText = '❌ No image selected.');
-      return;
+  Future<void> _startCameraFlow() async {
+    final cameras = await availableCameras();
+    final frontCamera = cameras.firstWhere(
+      (camera) => camera.lensDirection == CameraLensDirection.front,
+    );
+
+    final controller = CameraController(
+      frontCamera,
+      ResolutionPreset.medium,
+      enableAudio: false,
+    );
+
+    await controller.initialize();
+
+    final image = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CameraCaptureScreen(controller: controller),
+      ),
+    );
+
+    if (image != null && image is File) {
+      await _cropAndValidate(image);
     }
+  }
 
-    final CroppedFile? croppedImage = await ImageCropper().cropImage(
+  Future<void> _cropAndValidate(File image) async {
+    final cropped = await ImageCropper().cropImage(
       sourcePath: image.path,
       compressQuality: 90,
-
       uiSettings: [
         AndroidUiSettings(
           toolbarTitle: 'Crop Image',
           toolbarColor: Colors.deepOrange,
           toolbarWidgetColor: Colors.white,
-          initAspectRatio: CropAspectRatioPreset.original,
           lockAspectRatio: false,
         ),
         IOSUiSettings(title: 'Crop Image'),
       ],
     );
 
-    if (croppedImage == null) {
-      setState(() => _resultText = '❌ Cropping cancelled.');
+    if (cropped == null) {
+      setState(() {
+        _resultText = '? Cropping cancelled.';
+        _imageFile = null;
+      });
       return;
     }
 
-    final File finalImage = File(croppedImage.path);
+    final File finalImage = File(cropped.path);
     setState(() {
       _imageFile = finalImage;
-      _resultText = '🔍 Detecting face...';
+      _resultText = '?? Detecting face...';
     });
 
-    final bool isValid = await detectFace(finalImage.path);
+    final bool isValid = await _detectFace(finalImage.path);
     setState(() {
       _resultText = isValid
-          ? '✅ Face detected. Valid profile photo.'
-          : '❌ No face detected. Try again.';
+          ? '? Valid profile photo with clear face.'
+          : '? Invalid. Face not detected properly.';
     });
   }
 
-  Future<bool> detectFace(String imagePath) async {
-    final inputImage = InputImage.fromFilePath(imagePath);
+  Future<bool> _detectFace(String path) async {
+    final inputImage = InputImage.fromFilePath(path);
     final faceDetector = FaceDetector(
       options: FaceDetectorOptions(
-        enableContours: false,
-        enableClassification: true,
+        enableClassification: true, // for smile & eye open probs
+        enableLandmarks: true,
+        enableContours: true,
+        performanceMode: FaceDetectorMode.fast,
+        minFaceSize: 1, // minimum face size to detect
       ),
     );
 
-    final List<Face> faces = await faceDetector.processImage(inputImage);
+    final faces = await faceDetector.processImage(inputImage);
     await faceDetector.close();
 
-    return faces.isNotEmpty;
+    if (faces.isEmpty) return false;
+    if (faces.length > 1) {
+      setState(
+        () => _resultText =
+            '? Multiple faces detected. Please take a photo alone.',
+      );
+      return false;
+    }
+
+    for (Face face in faces) {
+      final rotX = face.headEulerAngleX ?? 0;
+      final rotY = face.headEulerAngleY ?? 0;
+      final rotZ = face.headEulerAngleZ ?? 0;
+
+      final smile = face.smilingProbability ?? 0;
+      final leftEyeOpen = face.leftEyeOpenProbability ?? 0;
+      final rightEyeOpen = face.rightEyeOpenProbability ?? 0;
+
+      final leftEye = face.landmarks[FaceLandmarkType.leftEye];
+      final rightEye = face.landmarks[FaceLandmarkType.rightEye];
+      final leftEar = face.landmarks[FaceLandmarkType.leftEar];
+      final rightEar = face.landmarks[FaceLandmarkType.rightEar];
+
+      bool isValid =
+          rotX.abs() < 15 &&
+          rotY.abs() < 15 &&
+          rotZ.abs() < 15 &&
+          smile < 0.7 &&
+          leftEyeOpen > 0.6 && // Eyes must be clearly open
+          rightEyeOpen > 0.6 &&
+          leftEye != null &&
+          rightEye != null &&
+          leftEar != null &&
+          rightEar != null;
+
+      if (isValid) return true;
+    }
+
+    return false;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Face Validation")),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            ElevatedButton(
-              onPressed: captureCropAndDetectFace,
-              child: Text('Capture and Validate Face'),
-            ),
-            SizedBox(height: 20),
-            if (_imageFile != null) Image.file(_imageFile!, height: 300),
-            SizedBox(height: 20),
-            Text(
-              _resultText,
-              style: TextStyle(
-                fontSize: 16,
-                color: _resultText.contains('✅') ? Colors.green : Colors.red,
+      appBar: AppBar(title: const Text("Face Validation")),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              if (_imageFile != null)
+                Image.file(_imageFile!, height: 300, fit: BoxFit.cover),
+              const SizedBox(height: 20),
+              Text(
+                _resultText,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: _resultText.contains('?') ? Colors.green : Colors.red,
+                ),
               ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _startCameraFlow,
+                child: const Text("Retake Photo"),
+              ),
+            ],
+          ),
         ),
       ),
     );
