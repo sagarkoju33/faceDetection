@@ -18,21 +18,21 @@ packages:
     source: hosted
     version: "2.1.2"
   camera:
-    dependency: "direct main"
-    description:
-      name: camera
-      sha256: d6ec2cbdbe2fa8f5e0d07d8c06368fe4effa985a4a5ddade9cc58a8cd849557d
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.11.2"
-  camera_android_camerax:
     dependency: transitive
     description:
-      name: camera_android_camerax
-      sha256: "58b8fe843a3c83fd1273c00cb35f5a8ae507f6cc9b2029bcf7e2abba499e28d8"
+      name: camera
+      sha256: dfa8fc5a1adaeb95e7a54d86a5bd56f4bb0e035515354c8ac6d262e35cec2ec8
       url: "https://pub.dev"
     source: hosted
-    version: "0.6.19+1"
+    version: "0.10.6"
+  camera_android:
+    dependency: transitive
+    description:
+      name: camera_android
+      sha256: "4f40d053a67e99029b5be7f00ef8047b63edb65ccc4e2546b84d47e302c6bf62"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.10.10+4"
   camera_avfoundation:
     dependency: transitive
     description:
@@ -97,6 +97,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.8"
+  facelivenessdetection:
+    dependency: "direct main"
+    description:
+      name: facelivenessdetection
+      sha256: "3fc51c088771d2ceafdeb4740b61b0f94e2781f493efc951cd8686ad89d71924"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.15"
   fake_async:
     dependency: transitive
     description:
@@ -180,18 +188,18 @@ packages:
     dependency: transitive
     description:
       name: google_mlkit_commons
-      sha256: "8f40fbac10685cad4715d11e6a0d86837d9ad7168684dfcad29610282a88e67a"
+      sha256: "7e9a6d6e66b44aa8cfe944bda9bc3346c52486dd890ca49e5bc98845cda40d7f"
       url: "https://pub.dev"
     source: hosted
-    version: "0.11.0"
+    version: "0.9.0"
   google_mlkit_face_detection:
-    dependency: "direct main"
+    dependency: transitive
     description:
       name: google_mlkit_face_detection
-      sha256: f336737d5b8a86797fd4368f42a5c26aeaa9c6dcc5243f0a16b5f6f663cfb70a
+      sha256: "65988405c884fd84a4ccc8bded7b5e3e4c33362f6f4eaaa94818bdaaba7bab7d"
       url: "https://pub.dev"
     source: hosted
-    version: "0.13.1"
+    version: "0.12.0"
   http:
     dependency: transitive
     description:
@@ -360,6 +368,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.0"
+  mnc_identifier_face:
+    dependency: "direct main"
+    description:
+      name: mnc_identifier_face
+      sha256: fe75dab1e9ed2f151f0fdcf6d75d61c83c89377950982ffc6b3bb80abeb69a27
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.2"
   path:
     dependency: transitive
     description:
@@ -583,4 +599,4 @@ packages:
     version: "1.1.0"
 sdks:
   dart: ">=3.8.1 <4.0.0"
-  flutter: ">=3.29.0"
+  flutter: ">=3.27.0"
