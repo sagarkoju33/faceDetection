@@ -1,167 +1,119 @@
-import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'face_detection_page.dart';
 import 'package:camera/camera.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:image_cropper/image_cropper.dart';
-import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
-import 'package:path/path.dart' as p;
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await requestCameraPermission();
 
-class FaceValidationScreen extends StatefulWidget {
-  const FaceValidationScreen({super.key});
-
-  @override
-  State<FaceValidationScreen> createState() => _FaceValidationScreenState();
+  runApp(const MyApp());
 }
 
-class _FaceValidationScreenState extends State<FaceValidationScreen> {
-  CameraController? _cameraController;
-  bool _isDetecting = false;
-  String _message = "Initializing camera...";
+/// Requests camera permission from the user.
+Future<void> requestCameraPermission() async {
+  final status = await Permission.camera.request();
+  if (!status.isGranted) {
+    // Handle permission denial
+    runApp(const PermissionDeniedApp());
+  }
+}
+
+class PermissionDeniedApp extends StatelessWidget {
+  const PermissionDeniedApp({super.key});
 
   @override
-  void initState() {
-    super.initState();
-    _initializeCamera();
-  }
-
-  Future<void> _initializeCamera() async {
-    final cameras = await availableCameras();
-    final frontCam = cameras.firstWhere(
-      (camera) => camera.lensDirection == CameraLensDirection.front,
-    );
-
-    _cameraController = CameraController(frontCam, ResolutionPreset.high);
-    await _cameraController!.initialize();
-
-    setState(() {
-      _message = "Please blink once to confirm you're real.";
-    });
-
-    _cameraController!.startImageStream(_processCameraImage);
-  }
-
-  Future<void> _processCameraImage(CameraImage image) async {
-    if (_isDetecting) return;
-    _isDetecting = true;
-
-    try {
-      final WriteBuffer allBytes = WriteBuffer();
-      for (final Plane plane in image.planes) {
-        allBytes.putUint8List(plane.bytes);
-      }
-
-      final inputImage = InputImage.fromBytes(
-        bytes: image.planes[0].bytes,
-        metadata: InputImageMetadata(
-          size: Size(image.width.toDouble(), image.height.toDouble()),
-          rotation: InputImageRotation.rotation0deg, // Adjust if needed
-          format: InputImageFormat.nv21, // Common format for Android
-          bytesPerRow: image.planes[0].bytesPerRow,
-        ),
-      );
-
-      final faceDetector = FaceDetector(
-        options: FaceDetectorOptions(
-          enableClassification: true,
-          performanceMode: FaceDetectorMode.accurate,
-          enableLandmarks: true,
-        ),
-      );
-
-      final faces = await faceDetector.processImage(inputImage);
-      if (faces.length != 1) {
-        setState(() {
-          _message = "Make sure only one real person is visible.";
-        });
-        _isDetecting = false;
-        return;
-      }
-
-      final face = faces.first;
-
-      // Basic liveness check: blink detection
-      final leftEye = face.leftEyeOpenProbability ?? 1.0;
-      final rightEye = face.rightEyeOpenProbability ?? 1.0;
-
-      if (leftEye < 0.5 && rightEye < 0.5) {
-        _cameraController!.stopImageStream();
-        _captureAndCropImage();
-      } else {
-        setState(() {
-          _message = "Please blink once.";
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _message = "Error: $e";
-      });
-    } finally {
-      _isDetecting = false;
-    }
-  }
-
-  Future<void> _captureAndCropImage() async {
-    try {
-      final file = await _cameraController!.takePicture();
-
-      final croppedFile = await ImageCropper().cropImage(
-        sourcePath: file.path,
-        compressQuality: 90,
-        uiSettings: [
-          AndroidUiSettings(
-            toolbarTitle: 'Crop Your Face',
-            toolbarColor: Colors.blue,
-            toolbarWidgetColor: Colors.white,
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: Scaffold(
+        appBar: AppBar(title: const Text("Permission Denied")),
+        body: Center(
+          child: AlertDialog(
+            title: const Text("Permission Denied"),
+            content: const Text("Camera access is required for verification."),
+            actions: [
+              TextButton(
+                onPressed: () => SystemNavigator.pop(),
+                child: const Text("OK"),
+              ),
+            ],
           ),
-          IOSUiSettings(title: 'Crop Your Face'),
-        ],
-      );
-
-      if (croppedFile != null) {
-        setState(() {
-          _message = "? Valid photo taken!";
-        });
-        // Save to local or send to server
-      } else {
-        setState(() {
-          _message = "Cropping cancelled.";
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _message = "Capture failed: $e";
-      });
-    }
+        ),
+      ),
+    );
   }
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
-  void dispose() {
-    _cameraController?.dispose();
-    super.dispose();
+  Widget build(BuildContext context) {
+    return const MaterialApp(title: 'Material App', home: HomePage());
   }
+}
+
+class HomePage extends StatelessWidget {
+  const HomePage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Face Validation")),
-      body: _cameraController == null
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                AspectRatio(
-                  aspectRatio: _cameraController!.value.aspectRatio,
-                  child: CameraPreview(_cameraController!),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  _message,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 16),
-                ),
-              ],
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.amberAccent,
+        toolbarHeight: 70,
+        centerTitle: true,
+        title: const Text('Verify Your Identity'),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              'Please click the button below to start verification',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 20),
             ),
+            const SizedBox(height: 30),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.all(20),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                foregroundColor: Colors.black,
+                backgroundColor: Colors.amberAccent,
+              ),
+              onPressed: () async {
+                final cameras = await availableCameras();
+                if (cameras.isNotEmpty) {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const FaceDetectionPage(),
+                    ),
+                  );
+                  if (result == true) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Verification Successful!')),
+                    );
+                  }
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Camera not active!')),
+                  );
+                }
+              },
+              child: const Text(
+                'Verify Now',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
