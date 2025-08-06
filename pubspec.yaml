@@ -36,12 +36,11 @@ dependencies:
   # camera: ^0.11.2
   path_provider: ^2.1.5
   permission_handler: ^12.0.1
-  # livelyness_detection: ^0.0.1+5
-  mnc_identifier_face: ^1.0.2
   facelivenessdetection: ^1.1.15
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
+  face_camera: ^0.1.4
 
 dev_dependencies:
   flutter_test:

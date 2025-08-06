@@ -368,14 +368,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.0"
-  mnc_identifier_face:
-    dependency: "direct main"
-    description:
-      name: mnc_identifier_face
-      sha256: fe75dab1e9ed2f151f0fdcf6d75d61c83c89377950982ffc6b3bb80abeb69a27
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.0.2"
   path:
     dependency: transitive
     description:
