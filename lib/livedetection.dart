@@ -13,88 +13,107 @@ class FaceVerificationWidget extends StatefulWidget {
 
 class _FaceVerificationWidgetState extends State<FaceVerificationWidget> {
   final List<Rulesets> _completedRuleset = [];
-  File? capturedImage;
+  XFile? capturedImage;
+  Rulesets? lastCompletedRuleset;
+  bool _hasCapturedImage = false;
 
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: SingleChildScrollView(
-        child: FaceDetectorView(
-          onSuccessValidation: (validated) {
-            log('Face verification is completed', name: 'Validation');
-          },
+      child: FaceDetectorView(
+        // onSuccessValidation: (validated) {
+        //   log('Face verification is completed', name: 'Validation');
+        // },
+        onRulesetCompleted: (ruleset) {
+          log('Ruleset completed: $ruleset');
+          if (!_completedRuleset.contains(ruleset)) {
+            setState(() {
+              _completedRuleset.add(ruleset);
+              lastCompletedRuleset = ruleset;
+            });
+          }
+        },
 
-          onValidationDone: (controller) {
-            // Capture image in background (async), don't call setState immediately
-            Future.microtask(() async {
-              if (controller != null && controller.value.isInitialized) {
-                try {
-                  final XFile file = await controller.takePicture();
+        onValidationDone: (controller) {
+          log(
+            'onValidationDone called, lastCompletedRuleset: $lastCompletedRuleset, hasCaptured: $_hasCapturedImage',
+          );
+
+          if (lastCompletedRuleset == Rulesets.smiling &&
+              !_hasCapturedImage &&
+              controller != null &&
+              controller.value.isInitialized) {
+            _hasCapturedImage = true;
+            log('Taking picture now...');
+            controller
+                .takePicture()
+                .then((file) {
+                  log('Picture taken: ${file.path}');
                   if (mounted) {
                     setState(() {
-                      capturedImage = File(file.path);
+                      capturedImage = file;
                     });
                   }
-                } catch (e) {
-                  print("Capture error: $e");
-                }
-              }
-            });
+                })
+                .catchError((e) {
+                  log('Capture error: $e');
+                  _hasCapturedImage = false;
+                });
+          }
 
-            // Return UI placeholder while image is being captured
-            return CircleAvatar(
-              radius: 100,
-              backgroundColor: Colors.grey[200],
-              child: capturedImage != null
-                  ? ClipOval(
-                      child: Image.file(capturedImage!, fit: BoxFit.cover),
-                    )
-                  : const Icon(Icons.person, size: 80),
-            );
-          },
+          return Column(
+            children: [
+              Text(
+                capturedImage != null
+                    ? "Face Verification: ${capturedImage!.path}"
+                    : "No image captured yet",
+              ),
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: capturedImage != null
+                    ? Image.file(
+                        File(capturedImage!.path),
+                        width: 200,
+                        height: 200,
+                        fit: BoxFit.cover,
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ],
+          );
+        },
 
-          child: ({required countdown, required state, required hasFace}) {
-            return SafeArea(
-              child: Center(
-                child: Column(
+        child: ({required countdown, required state, required hasFace}) {
+          return SafeArea(
+            child: Column(
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const SizedBox(height: 40),
-                        Flexible(
-                          child: AnimatedSize(
-                            duration: const Duration(milliseconds: 150),
-                            child: Text(
-                              hasFace
-                                  ? 'User face found'
-                                  : 'User face not found',
-                              style: _textStyle,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      _rulesetHints[state] ?? 'Please follow instructions',
-                      style: _textStyle.copyWith(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
+                    const SizedBox(height: 40),
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 150),
+                      child: Text(
+                        hasFace ? 'User face found' : 'User face not found',
+                        style: _textStyle,
                       ),
                     ),
                   ],
                 ),
-              ),
-            );
-          },
-          onRulesetCompleted: (ruleset) {
-            if (!_completedRuleset.contains(ruleset)) {
-              setState(() => _completedRuleset.add(ruleset));
-            }
-          },
-        ),
+                const SizedBox(height: 20),
+                Text(
+                  _rulesetHints[state] ?? 'Please follow instructions',
+                  style: _textStyle.copyWith(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
